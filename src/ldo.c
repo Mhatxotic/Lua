@@ -78,11 +78,6 @@ typedef struct lua_longjmp {
 /* C++ exceptions */
 #define LUAI_THROW(L,c)		throw(c)
 
-#include <stdexcept>
-
-#include "lauxlib.h"
-
-
 static void LUAI_TRY (lua_State *L, lua_longjmp *c, Pfunc f, void *ud) {
   try {
     f(L, ud);  /* call function protected */
@@ -168,34 +163,8 @@ TStatus luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   lj.status = LUA_OK;
   lj.previous = L->errorJmp;  /* chain new error handler */
   L->errorJmp = &lj;
-#if defined(__cplusplus)
-	try { (*f)(L, ud); }
-	catch(struct lua_longjmp *e) { lj.status = (e->status != 0) ? e->status : LUA_ERRRUN; }
-	catch(const std::exception &e){
-		try{
-			luaL_where(L, 1);
-			lua_pushstring(L, e.what());
-			lua_concat(L, 2);
-			lua_error(L);
-		}
-		catch(struct lua_longjmp *e2) { lj.status = (e2->status != 0) ? e2->status : LUA_ERRRUN; }
-	}
-	catch(...){
-		try{
-			luaL_where(L, 1);
-			lua_pushstring(L, "Unknown C++ exception!");
-			lua_concat(L, 2);
-			lua_error(L);
-		}
-		catch(struct lua_longjmp *e2) { lj.status = (e2->status != 0) ? e2->status : LUA_ERRRUN; }
-	}
-#else
-
   LUAI_TRY(L, &lj, f, ud);  /* call 'f' catching errors */
-  
-#endif
-
-	L->errorJmp = lj.previous;  /* restore old error handler */
+  L->errorJmp = lj.previous;  /* restore old error handler */
   L->nCcalls = oldnCcalls;
   return lj.status;
 }
